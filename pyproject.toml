@@ -11,12 +11,14 @@ dependencies = [
     "numpy>=2.5.3",
     "pillow>=12.3.0",
     "pydantic>=2.13.5",
-    "torch>=2.13.0",
+    "torch==2.9.0",
+    "torch-xla[tpu]==2.9.0",
 ]
 
 [project.scripts]
 
 train-arnet-blend = "arnet_dynamic_blend.train:main"
+train-arnet-tpu = "ai_guide.train_tpu:main"
 blend-arnet = "app.predict:blend_all"
 test = "app.test:main"
 test-dataset = "app.dataset:main"
@@ -27,7 +29,7 @@ uv-blend = "ai_guide.blend_all:main"
 dataset = "ai_guide.dataset:load_inputs"
 
 [tool.uv.build-backend]
-module-name = ["app", "ai_guide"]
+module-name = ["app", "ai_guide", "arnet_dynamic_blend"]
 
 [build-system]
 requires = ["uv_build>=0.12.0,<0.13.0"]
