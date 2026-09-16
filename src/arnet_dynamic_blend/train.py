@@ -44,7 +44,7 @@ def main():
     parser.add_argument("--output", type=Path, default=Path("model/arnet_blend_tpu"))
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--base-channels", type=int, default=32)
-    parser.add_argument("--scale", type=float, default=0.5)
+    parser.add_argument("--scale", type=float, default=0.3)
     parser.add_argument("--size", type=int, default=None, help="Optional fixed square resolution; default preserves scaled dimensions")
     parser.add_argument("--lr", type=float, default=0.002)
     parser.add_argument("--seed", type=int, default=69)

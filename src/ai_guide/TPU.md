@@ -46,7 +46,7 @@ The trainer selects the TPU backend automatically; there is no CPU/CUDA fallback
 
 - Single XLA device only. Multi-chip/multi-host TPU training is not implemented.
 - The original ArNet architecture and supervised MSE loss are reused.
-- Defaults: `--scale 0.5` (50% width and height), 32 base channels. Scaled
+- Defaults: `--scale 0.3` (30% width and height), 32 base channels. Scaled
   dimensions are preserved by default. This can use much more memory than
   256-square training. Optional `--size 256` resizes inputs and targets to a
   fixed square, reducing memory and spatial-shape recompilation but distorting
