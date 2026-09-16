@@ -1,7 +1,9 @@
 # Single-device v5e-1 TPU training
 
-Branch: `feat/arnet-tpu-v5e`. Uses PyTorch/XLA, not CUDA. The ordinary ArNet
-trainer remains unchanged; use the dedicated `train-arnet-tpu` command.
+Branch: `feat/arnet-tpu-v5e`. Uses PyTorch/XLA, not CUDA. On this branch,
+`src/arnet_dynamic_blend/train.py` is the TPU trainer. Run `train-arnet-blend`;
+`train-arnet-tpu` remains a compatibility alias. Other models are unchanged.
+The trainer selects the TPU backend automatically; there is no CPU/CUDA fallback.
 
 ## Colab terminal
 
@@ -31,13 +33,13 @@ trainer remains unchanged; use the dedicated `train-arnet-tpu` command.
 4. Train (ensure `datasets/train` symlinks and source images exist on the VM):
 
    ```bash
-   PJRT_DEVICE=TPU uv run train-arnet-tpu --epochs 20 --size 256
+   uv run train-arnet-blend --epochs 20 --size 256
    ```
 
    Or run directly from source:
 
    ```bash
-   PYTHONPATH=src PJRT_DEVICE=TPU uv run python -m ai_guide.train_tpu --epochs 20
+   PYTHONPATH=src uv run python -m arnet_dynamic_blend.train --epochs 20
    ```
 
 ## Behavior and limitations
