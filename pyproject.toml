@@ -10,6 +10,7 @@ requires-python = ">=3.12"
 dependencies = [
     "numpy>=2.5.3",
     "pillow>=12.3.0",
+    "pydantic>=2.13.5",
     "torch>=2.13.0",
 ]
 
@@ -22,9 +23,25 @@ url = "https://download.pytorch.org/whl/cpu"
 explicit = true
 
 [project.scripts]
+
+train-arnet = "app.train:main"
+blend-arnet = "app.predict:blend_all"
 test = "app.test:main"
-start = "app.main:main"
+test-dataset = "app.dataset:main"
+train-blend = "ai_guide.train:main"
+predict-blend = "ai_guide.predict:main"
+uv-blend = "ai_guide.blend_all:main"
+
+dataset = "ai_guide.dataset:load_inputs"
+
+[tool.uv.build-backend]
+module-name = ["app", "ai_guide"]
 
 [build-system]
 requires = ["uv_build>=0.12.0,<0.13.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.414",
+]
