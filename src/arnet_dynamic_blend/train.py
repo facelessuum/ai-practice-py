@@ -58,7 +58,7 @@ def main():
     print(f"Device: {device} ({xr.device_type()}); cases: {len(source)}; output: {run}", flush=True)
     print(f"Parameters: {sum(p.numel() for p in model.parameters()):,}", flush=True)
     print("The first steps compile XLA graphs and may be slow.", flush=True)
-    print(f"Original-resolution crops: {args.crop_width}x{args.crop_height}; padded pixels masked.", flush=True)
+    print(f"Target-resolution crops: {args.crop_width}x{args.crop_height}; padded pixels masked.", flush=True)
     print("Different exposure counts can still trigger TPU recompilation.", flush=True)
     model.train()
     for epoch in range(args.epochs):
@@ -80,7 +80,7 @@ def main():
             "architecture": "arnet_blend",
             "base_channels": args.base_channels,
             "scale": 1.0,
-            "preprocessing": "random_crop_with_edge_padding",
+            "preprocessing": "resize_inputs_to_target_then_random_crop_with_edge_padding",
             "crop_width": args.crop_width,
             "crop_height": args.crop_height,
             "epoch": epoch + 1,

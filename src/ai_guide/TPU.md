@@ -45,13 +45,18 @@ The trainer selects the TPU backend automatically; there is no CPU/CUDA fallback
 ## Behavior and limitations
 
 - Single XLA device only. Multi-chip/multi-host TPU training is not implemented.
-- Defaults: original-resolution random crops, **512 wide x 512 high**, and
+- Defaults: target-resolution random crops, **512 wide x 512 high**, and
   32 base channels. `--scale` and `--size` have been replaced by `--crop-width`
-  and `--crop-height`. There is no resize or aspect-ratio distortion.
+  and `--crop-height`.
+- Inputs are resized with LANCZOS to the unchanged target's dimensions if needed.
+  Aspect ratios must match within 0.1% (rounding tolerance); otherwise loading
+  fails rather than stretching the scene. All input exposures must have the same
+  source dimensions. Downsampling loses some input detail; upsampling does not
+  create new detail. Targets are never resized by this crop loader.
 - Each case samples one new location per epoch. Exactly the same crop coordinates
-  are used for every exposure and its target. Inputs and target must already be
-  aligned and have identical source dimensions; mismatches raise an error instead
-  of silently resizing. Crops retain local detail but lose whole-scene context.
+  are used for every normalized exposure and its target. Images must already
+  have matching framing/alignment: matching aspect ratios do not guarantee this.
+  Crops retain target-resolution detail but lose whole-scene context.
 - Images smaller than the crop are edge-padded on the bottom/right. A validity
   mask excludes padding from MSE loss; RGB errors are averaged over real pixels.
 - Batch size is one case. Height and width are now fixed, but different exposure
@@ -65,6 +70,9 @@ The trainer selects the TPU backend automatically; there is no CPU/CUDA fallback
   `loss_history.json` and `arnet_blend.pt`. Each completed epoch replaces that
   run's checkpoint. There is no resume command or early stopping yet.
 - Checkpoints record crop dimensions, preprocessing type, and `scale=1.0`.
+  This scale means no global fractional resize; training still normalizes input
+  resolution to the target. Target-free inference must choose its working
+  resolution explicitly and assess quality at that resolution.
   Inference tiling is not implemented here. The fully convolutional model can
   accept larger images, but full-resolution prediction may exceed memory;
   overlapping-tile inference would need to be added separately. Evaluate on

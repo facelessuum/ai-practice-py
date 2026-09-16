@@ -94,8 +94,10 @@ class ExposureDataset(Dataset):
 
 
 class CropExposureDataset(ExposureDataset):
-    """Original-resolution paired crops; returns inputs, target and valid mask.
+    """Target-resolution paired crops; returns inputs, target and valid mask.
 
+    Inputs are resized to target resolution when aspect ratios match (0.1%
+    tolerance for rounding). All images must already share alignment/framing.
     A new crop is sampled on each access. Short dimensions are edge-padded on
     the bottom/right, and padded pixels are excluded by the returned mask.
     """
@@ -117,22 +119,35 @@ class CropExposureDataset(ExposureDataset):
             raise ValueError(f"No input images in {case / '10_converted'}")
         target_path = case / "50_ai_blend" / "output.jpg"
         with Image.open(paths[0]) as image:
+            input_size = image.size
+        with Image.open(target_path) as image:
             width, height = image.size
+        input_ratio = input_size[0] / input_size[1]
+        target_ratio = width / height
+        if abs(input_ratio / target_ratio - 1) > 0.001:
+            raise ValueError(
+                f"{case}: input dimensions {input_size} and target dimensions "
+                f"{(width, height)} have different aspect ratios. "
+                "Align framing before paired cropping; refusing to stretch images."
+            )
         left = torch.randint(max(0, width - self.crop_width) + 1, ()).item()
         top = torch.randint(max(0, height - self.crop_height) + 1, ()).item()
         valid_width = min(width, self.crop_width)
         valid_height = min(height, self.crop_height)
         box = (left, top, left + valid_width, top + valid_height)
 
-        def read_crop(path):
+        def read_crop(path, is_target=False):
             with Image.open(path) as image:
-                if image.size != (width, height):
+                expected_size = (width, height) if is_target else input_size
+                if image.size != expected_size:
                     raise ValueError(
-                        f"{path}: dimensions {image.size} differ from {(width, height)}. "
-                        "Original-resolution paired cropping requires aligned, "
-                        "matching inputs and target; no automatic resizing is applied."
+                        f"{path}: dimensions {image.size} differ from {expected_size}. "
+                        "All input exposures must have matching dimensions."
                     )
-                pixels = np.array(image.convert("RGB").crop(box), dtype=np.float32)
+                rgb = image.convert("RGB")
+                if not is_target and rgb.size != (width, height):
+                    rgb = rgb.resize((width, height), Image.Resampling.LANCZOS)
+                pixels = np.array(rgb.crop(box), dtype=np.float32)
             pixels = np.pad(
                 pixels,
                 ((0, self.crop_height - valid_height),
@@ -142,7 +157,7 @@ class CropExposureDataset(ExposureDataset):
             return torch.from_numpy(pixels / 255.0).permute(2, 0, 1).contiguous()
 
         inputs = torch.stack([read_crop(path) for path in paths])
-        target = read_crop(target_path)
+        target = read_crop(target_path, is_target=True)
         mask = torch.zeros(1, self.crop_height, self.crop_width)
         mask[:, :valid_height, :valid_width] = 1
         return inputs, target, mask
