@@ -1,6 +1,24 @@
+from pathlib import Path
+import torch
 import numpy as np
 
-def main() -> None:
+
+def main() -> Path:
+
+    output_path = Path("model")
+    output_path.mkdir(parents=True, exist_ok=True)
+    run_number = 1
+
+    while True:
+        output_dir = output_path / f"run_{run_number:04d}"
+        try:
+            output_dir.mkdir()
+        except FileExistsError:
+            run_number += 1
+            continue
+        return output_dir
+
+    return
     a = np.array(
         [
             [[1, 2, 3, 4], [4, 5, 6, 2], [7, 8, 9, 1]],
@@ -18,10 +36,6 @@ def main() -> None:
     print(f"A {a.ndim}D", "DIMENSION")
     print(f"A {a.dtype}", "TYPE")
     print(f"A {a.itemsize}", "ITEMSIZE")
-
-    print("---")
-    print("---")
-    print("---")
 
     print(b)
     print(f"B {b.shape}", "SHAPE")
