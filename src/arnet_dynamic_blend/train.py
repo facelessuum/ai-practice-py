@@ -7,35 +7,12 @@ import os
 from pathlib import Path
 
 import torch
-from torch.nn import functional as F
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 
-from .dataset import ExposureDataset
+from .dataset import CropExposureDataset
 from .loss import blend_loss
 from .model import ArNetDynamicModel
 from .utils import check_output, create_run
-
-
-class FixedSizeDataset(Dataset):
-    """Resize on CPU before transfer to avoid spatial-shape recompilation."""
-
-    def __init__(self, source, size):
-        self.source = source
-        self.size = (size, size)
-
-    def __len__(self):
-        return len(self.source)
-
-    def __getitem__(self, index):
-        images, target = self.source[index]
-        images = F.interpolate(
-            images, size=self.size, mode="bilinear", align_corners=False, antialias=True
-        )
-        target = F.interpolate(
-            target.unsqueeze(0), size=self.size, mode="bilinear",
-            align_corners=False, antialias=True,
-        )[0]
-        return images, target
 
 
 def main():
@@ -44,15 +21,15 @@ def main():
     parser.add_argument("--output", type=Path, default=Path("model/arnet_blend_tpu"))
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--base-channels", type=int, default=32)
-    parser.add_argument("--scale", type=float, default=0.3)
-    parser.add_argument("--size", type=int, default=None, help="Optional fixed square resolution; default preserves scaled dimensions")
+    parser.add_argument("--crop-width", type=int, default=512)
+    parser.add_argument("--crop-height", type=int, default=512)
     parser.add_argument("--lr", type=float, default=0.002)
     parser.add_argument("--seed", type=int, default=69)
     args = parser.parse_args()
-    if min(args.epochs, args.base_channels) < 1 or (args.size is not None and args.size < 4):
-        parser.error("epochs/channels must be positive and size must be >= 4")
-    if not 0 < args.scale <= 1 or not 0 < args.lr < float("inf"):
-        parser.error("scale must be in (0, 1] and lr finite and positive")
+    if min(args.epochs, args.base_channels) < 1 or min(args.crop_width, args.crop_height) < 4:
+        parser.error("epochs/channels must be positive and crop dimensions must be >= 4")
+    if not 0 < args.lr < float("inf"):
+        parser.error("lr must be finite and positive")
     check_output(args.output, args.data)
 
     # Explicit TPU backend: do not silently fall back to CPU or CUDA.
@@ -70,11 +47,10 @@ def main():
         raise RuntimeError("This trainer supports a single-device v5e-1 runtime only")
     torch.manual_seed(args.seed)
     xm.set_rng_state(args.seed, device)
-    source = ExposureDataset(args.data, args.scale)
+    source = CropExposureDataset(args.data, args.crop_width, args.crop_height)
     for case in source.skipped_cases:
         print(f"Skipping missing target: {case}", flush=True)
-    dataset = FixedSizeDataset(source, args.size) if args.size is not None else source
-    loader = DataLoader(dataset, batch_size=1, shuffle=True)
+    loader = DataLoader(source, batch_size=1, shuffle=True)
     model = ArNetDynamicModel(args.base_channels).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, foreach=False)
     run = create_run(args.output)
@@ -82,15 +58,15 @@ def main():
     print(f"Device: {device} ({xr.device_type()}); cases: {len(source)}; output: {run}", flush=True)
     print(f"Parameters: {sum(p.numel() for p in model.parameters()):,}", flush=True)
     print("The first steps compile XLA graphs and may be slow.", flush=True)
-    if args.size is None:
-        print("Using scaled image dimensions; different shapes can trigger TPU recompilation.", flush=True)
+    print(f"Original-resolution crops: {args.crop_width}x{args.crop_height}; padded pixels masked.", flush=True)
+    print("Different exposure counts can still trigger TPU recompilation.", flush=True)
     model.train()
     for epoch in range(args.epochs):
         total = 0.0
-        for index, (images, target) in enumerate(loader, start=1):
-            images, target = images.to(device), target.to(device)
+        for index, (images, target, mask) in enumerate(loader, start=1):
+            images, target, mask = images.to(device), target.to(device), mask.to(device)
             optimizer.zero_grad(set_to_none=True)
-            loss = blend_loss(model(images), target)
+            loss = blend_loss(model(images), target, mask)
             loss.backward()
             # barrier executes the lazy graph; plain optimizer.step is not enough.
             xm.optimizer_step(optimizer, barrier=True)
@@ -103,8 +79,10 @@ def main():
         checkpoint = {
             "architecture": "arnet_blend",
             "base_channels": args.base_channels,
-            "scale": args.scale,
-            "training_size": args.size,
+            "scale": 1.0,
+            "preprocessing": "random_crop_with_edge_padding",
+            "crop_width": args.crop_width,
+            "crop_height": args.crop_height,
             "epoch": epoch + 1,
             "lr": args.lr,
             "seed": args.seed,

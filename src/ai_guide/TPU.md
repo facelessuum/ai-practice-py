@@ -45,24 +45,31 @@ The trainer selects the TPU backend automatically; there is no CPU/CUDA fallback
 ## Behavior and limitations
 
 - Single XLA device only. Multi-chip/multi-host TPU training is not implemented.
-- The original ArNet architecture and supervised MSE loss are reused.
-- Defaults: `--scale 0.3` (30% width and height), 32 base channels. Scaled
-  dimensions are preserved by default. This can use much more memory than
-  256-square training. Optional `--size 256` resizes inputs and targets to a
-  fixed square, reducing memory and spatial-shape recompilation but distorting
-  aspect ratios. The transform is applied identically to inputs and targets.
-- Batch size is one case. Different resolutions or exposure counts create different graph
-  shapes and can trigger recompilation. The first steps compile and may be slow.
+- Defaults: original-resolution random crops, **512 wide x 512 high**, and
+  32 base channels. `--scale` and `--size` have been replaced by `--crop-width`
+  and `--crop-height`. There is no resize or aspect-ratio distortion.
+- Each case samples one new location per epoch. Exactly the same crop coordinates
+  are used for every exposure and its target. Inputs and target must already be
+  aligned and have identical source dimensions; mismatches raise an error instead
+  of silently resizing. Crops retain local detail but lose whole-scene context.
+- Images smaller than the crop are edge-padded on the bottom/right. A validity
+  mask excludes padding from MSE loss; RGB errors are averaged over real pixels.
+- Batch size is one case. Height and width are now fixed, but different exposure
+  counts still change graph shapes and can trigger recompilation. The first steps
+  compile and may be slow. Fixed-size crops do NOT guarantee fitting TPU memory. If
+  needed use `--crop-width 256 --crop-height 256` (no downsampling).
 - Uses `xm.optimizer_step(..., barrier=True)` for lazy graph execution and
   `xm.save` for CPU-portable checkpoints. Per-case loss logging synchronizes with
   the TPU; this is a simple baseline, not a throughput-optimized trainer.
 - Each run saves under `model/arnet_blend_tpu/run_XXXX/`, including epoch mean
   `loss_history.json` and `arnet_blend.pt`. Each completed epoch replaces that
   run's checkpoint. There is no resume command or early stopping yet.
-- Checkpoints record `training_size` (`None` when using only `--scale`). Existing
-  inference code does not use that field automatically. If `--size` was used,
-  resize inputs to the same square size to match training preprocessing. The fully convolutional model can accept other dimensions,
-  but assess quality when changing resolution/aspect ratio.
+- Checkpoints record crop dimensions, preprocessing type, and `scale=1.0`.
+  Inference tiling is not implemented here. The fully convolutional model can
+  accept larger images, but full-resolution prediction may exceed memory;
+  overlapping-tile inference would need to be added separately. Evaluate on
+  deterministic held-out crops or complete scenes rather than random training
+  crops when comparing model quality.
 - Colab local storage is temporary. Use `--output` with a persistent mounted
   directory to preserve completed checkpoints if the runtime is reclaimed.
 - TPU execution must be verified on the actual v5e-1 runtime; local syntax
