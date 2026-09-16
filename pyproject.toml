@@ -24,7 +24,7 @@ explicit = true
 
 [project.scripts]
 
-train-arnet = "app.train:main"
+train-arnet-blend = "arnet_dynamic_blend.train:main"
 blend-arnet = "app.predict:blend_all"
 test = "app.test:main"
 test-dataset = "app.dataset:main"

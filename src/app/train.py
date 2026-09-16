@@ -47,8 +47,6 @@ def main():
 
             label = f"Epoch {epoch + 1}/{args.epochs}, case {index}/{len(dataset)}"
 
-            #            print(f"{label}: {dark.shape[-1]}x{dark.shape[-2]} -- forward pass...")
-
             optimizer.zero_grad()
             output = model(dark, middle, bright)
             loss = exposure_loss(output, target)
@@ -56,12 +54,6 @@ def main():
             loss.backward()
             optimizer.step()
             total += loss.item() * len(dark)
-
-            #            print(
-            #               f"{label}: loss={loss.item():.6f}, compute time={perf_counter() - started:.1f}s",
-            #        flush=True,
-            #    )
-
             print(
                 f"{label} | Time {perf_counter() - started:.1f}s | Loss={total / len(dataset):.6f} | Size={target.shape[-1]}x{target.shape[-2]}",
                 flush=True,
