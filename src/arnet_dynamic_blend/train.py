@@ -1,6 +1,4 @@
-"""Supervised training: python -m unet_dynamic_blend.train --help."""
-
-from unet_dynamic_blend import DynamicUNetBlend
+"""Supervised training for the dynamic ArNet blend model."""
 
 import argparse
 import json
@@ -23,25 +21,23 @@ def main():
     parser.add_argument("--base-channels", type=int, default=32)
     parser.add_argument("--scale", type=float, default=0.25)
     parser.add_argument("--lr", type=float, default=0.002)
-    parser.add_argument("--threads", type=int, default=10)
     parser.add_argument("--seed", type=int, default=69)
-    parser.add_argument("--device", default="cpu")
     args = parser.parse_args()
-    if min(args.epochs, args.base_channels, args.threads) < 1:
-        parser.error("epochs, base-channels and threads must be positive")
+    if min(args.epochs, args.base_channels) < 1:
+        parser.error("epochs and base-channels must be positive")
     if not 0 < args.scale <= 1 or not 0 < args.lr < float("inf"):
         parser.error("scale must be in (0, 1] and lr must be finite and positive")
 
     check_output(args.output, args.data)
     torch.manual_seed(args.seed)
-    torch.set_num_threads(args.threads)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     datasets = ExposureDataset(args.data, args.scale)
 
     for case in datasets.skipped_cases:
         print(f"Skipping missing target: {case}", flush=True)
 
     loader = DataLoader(datasets, batch_size=1, shuffle=True)
-    model = ArNetDynamicModel(args.base_channels).to(args.device)
+    model = ArNetDynamicModel(args.base_channels).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     run = create_run(args.output)
 
@@ -55,7 +51,7 @@ def main():
         total = 0.0
         for index, (images, target) in enumerate(loader, start=1):
             started = perf_counter()
-            images, target = images.to(args.device), target.to(args.device)
+            images, target = images.to(device), target.to(device)
             optimizer.zero_grad(set_to_none=True)
             loss = blend_loss(model(images), target)
             if not torch.isfinite(loss):
@@ -88,5 +84,7 @@ def main():
         (run / "loss_history.json").write_text(json.dumps(history, indent=2) + "\n")
     print(f"Saved: {run / 'arnet_blend.pt'}")
 
-    if __name__ == "__main__":
-        main()
+
+
+if __name__ == "__main__":
+    main()

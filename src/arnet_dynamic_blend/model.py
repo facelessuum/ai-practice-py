@@ -1,5 +1,3 @@
-from statistics import mode
-from ast import mod
 from torch import Tensor, nn
 from torch.nn import functional as TF
 import torch
@@ -10,9 +8,9 @@ class DoubleConv(nn.Sequential):
 
     def __init__(self, in_channels: int, out_channels: int):
         super().__init__(
-            nn.Conv2d(in_channels, out_channels, 3, padding=1),
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.Conv2d(out_channels, out_channels, 3, padding=1),
+            nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
             nn.ReLU(),
         )
 

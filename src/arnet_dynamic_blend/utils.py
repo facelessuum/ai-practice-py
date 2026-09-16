@@ -33,10 +33,10 @@ def create_run(root: Path) -> Path:
 def latest_checkpoint(root: Path) -> Path:
     paths = [
         path
-        for path in root.glob("run.*/arnet_dynamic.pt")
+        for path in root.glob("run_*/arnet_blend.pt")
         if path.is_file() and path.parent.name.removeprefix("run_").isdigit()
     ]
     if not paths:
-        raise FileNotFoundError(f"No run_*/arnet_dynamic.pt checkpoints in {root}")
+        raise FileNotFoundError(f"No run_*/arnet_blend.pt checkpoints in {root}")
 
     return max(paths, key=lambda path: int(path.parent.name.removeprefix("run_")))
