@@ -33,7 +33,7 @@ The trainer selects the TPU backend automatically; there is no CPU/CUDA fallback
 4. Train (ensure `datasets/train` symlinks and source images exist on the VM):
 
    ```bash
-   uv run train-arnet-blend --epochs 20 --size 256
+   uv run train-arnet-blend --epochs 20
    ```
 
    Or run directly from source:
@@ -46,10 +46,12 @@ The trainer selects the TPU backend automatically; there is no CPU/CUDA fallback
 
 - Single XLA device only. Multi-chip/multi-host TPU training is not implemented.
 - The original ArNet architecture and supervised MSE loss are reused.
-- Inputs are loaded at `--scale` then inputs and targets are resized on CPU to
-  `--size` square. This distorts aspect ratios but stabilizes spatial shapes for
-  compilation. The transform is applied identically to inputs and targets.
-- Batch size is one case. Different exposure counts still create different graph
+- Defaults: `--scale 0.5` (50% width and height), 32 base channels. Scaled
+  dimensions are preserved by default. This can use much more memory than
+  256-square training. Optional `--size 256` resizes inputs and targets to a
+  fixed square, reducing memory and spatial-shape recompilation but distorting
+  aspect ratios. The transform is applied identically to inputs and targets.
+- Batch size is one case. Different resolutions or exposure counts create different graph
   shapes and can trigger recompilation. The first steps compile and may be slow.
 - Uses `xm.optimizer_step(..., barrier=True)` for lazy graph execution and
   `xm.save` for CPU-portable checkpoints. Per-case loss logging synchronizes with
@@ -57,9 +59,9 @@ The trainer selects the TPU backend automatically; there is no CPU/CUDA fallback
 - Each run saves under `model/arnet_blend_tpu/run_XXXX/`, including epoch mean
   `loss_history.json` and `arnet_blend.pt`. Each completed epoch replaces that
   run's checkpoint. There is no resume command or early stopping yet.
-- Checkpoints record `training_size`. Existing inference code does not use that
-  field automatically. To match training preprocessing, resize inputs to the
-  same square size. The fully convolutional model can accept other dimensions,
+- Checkpoints record `training_size` (`None` when using only `--scale`). Existing
+  inference code does not use that field automatically. If `--size` was used,
+  resize inputs to the same square size to match training preprocessing. The fully convolutional model can accept other dimensions,
   but assess quality when changing resolution/aspect ratio.
 - Colab local storage is temporary. Use `--output` with a persistent mounted
   directory to preserve completed checkpoints if the runtime is reclaimed.

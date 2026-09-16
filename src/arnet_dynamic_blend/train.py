@@ -44,12 +44,12 @@ def main():
     parser.add_argument("--output", type=Path, default=Path("model/arnet_blend_tpu"))
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--base-channels", type=int, default=32)
-    parser.add_argument("--scale", type=float, default=0.15)
-    parser.add_argument("--size", type=int, default=256, help="Fixed square training resolution")
+    parser.add_argument("--scale", type=float, default=0.5)
+    parser.add_argument("--size", type=int, default=None, help="Optional fixed square resolution; default preserves scaled dimensions")
     parser.add_argument("--lr", type=float, default=0.002)
     parser.add_argument("--seed", type=int, default=69)
     args = parser.parse_args()
-    if min(args.epochs, args.base_channels) < 1 or args.size < 4:
+    if min(args.epochs, args.base_channels) < 1 or (args.size is not None and args.size < 4):
         parser.error("epochs/channels must be positive and size must be >= 4")
     if not 0 < args.scale <= 1 or not 0 < args.lr < float("inf"):
         parser.error("scale must be in (0, 1] and lr finite and positive")
@@ -73,7 +73,8 @@ def main():
     source = ExposureDataset(args.data, args.scale)
     for case in source.skipped_cases:
         print(f"Skipping missing target: {case}", flush=True)
-    loader = DataLoader(FixedSizeDataset(source, args.size), batch_size=1, shuffle=True)
+    dataset = FixedSizeDataset(source, args.size) if args.size is not None else source
+    loader = DataLoader(dataset, batch_size=1, shuffle=True)
     model = ArNetDynamicModel(args.base_channels).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, foreach=False)
     run = create_run(args.output)
@@ -81,6 +82,8 @@ def main():
     print(f"Device: {device} ({xr.device_type()}); cases: {len(source)}; output: {run}", flush=True)
     print(f"Parameters: {sum(p.numel() for p in model.parameters()):,}", flush=True)
     print("The first steps compile XLA graphs and may be slow.", flush=True)
+    if args.size is None:
+        print("Using scaled image dimensions; different shapes can trigger TPU recompilation.", flush=True)
     model.train()
     for epoch in range(args.epochs):
         total = 0.0
