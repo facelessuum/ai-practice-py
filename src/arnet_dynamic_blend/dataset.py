@@ -91,3 +91,58 @@ class ExposureDataset(Dataset):
         )
 
         return inputs, target
+
+
+class CropExposureDataset(ExposureDataset):
+    """Original-resolution paired crops; returns inputs, target and valid mask.
+
+    A new crop is sampled on each access. Short dimensions are edge-padded on
+    the bottom/right, and padded pixels are excluded by the returned mask.
+    """
+
+    def __init__(self, path: Path, crop_width: int = 512, crop_height: int = 512):
+        super().__init__(path, scale=1.0)
+        if min(crop_width, crop_height) < 4:
+            raise ValueError("Crop dimensions must be at least 4")
+        self.crop_width = crop_width
+        self.crop_height = crop_height
+
+    def __getitem__(self, index):
+        case = self.cases[index]
+        paths = sorted(
+            path for path in (case / "10_converted").glob("*")
+            if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS
+        )
+        if not paths:
+            raise ValueError(f"No input images in {case / '10_converted'}")
+        target_path = case / "50_ai_blend" / "output.jpg"
+        with Image.open(paths[0]) as image:
+            width, height = image.size
+        left = torch.randint(max(0, width - self.crop_width) + 1, ()).item()
+        top = torch.randint(max(0, height - self.crop_height) + 1, ()).item()
+        valid_width = min(width, self.crop_width)
+        valid_height = min(height, self.crop_height)
+        box = (left, top, left + valid_width, top + valid_height)
+
+        def read_crop(path):
+            with Image.open(path) as image:
+                if image.size != (width, height):
+                    raise ValueError(
+                        f"{path}: dimensions {image.size} differ from {(width, height)}. "
+                        "Original-resolution paired cropping requires aligned, "
+                        "matching inputs and target; no automatic resizing is applied."
+                    )
+                pixels = np.array(image.convert("RGB").crop(box), dtype=np.float32)
+            pixels = np.pad(
+                pixels,
+                ((0, self.crop_height - valid_height),
+                 (0, self.crop_width - valid_width), (0, 0)),
+                mode="edge",
+            )
+            return torch.from_numpy(pixels / 255.0).permute(2, 0, 1).contiguous()
+
+        inputs = torch.stack([read_crop(path) for path in paths])
+        target = read_crop(target_path)
+        mask = torch.zeros(1, self.crop_height, self.crop_width)
+        mask[:, :valid_height, :valid_width] = 1
+        return inputs, target, mask
