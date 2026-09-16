@@ -5,8 +5,24 @@ build/
 dist/
 wheels/
 *.egg-info
-data
-# Generated blend runs
+# Local datasets and generated artifacts (never commit)
+/data/
+/datasets/
+/splits/
+/model/
+/models/
+/runs/
 /output/
+/outputs/
+/checkpoints/
+/predictions/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.zip
+*.tar
+*.tar.gz
+*.tgz
 # Virtual environments
 .venv
