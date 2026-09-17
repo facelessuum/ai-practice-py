@@ -1,4 +1,4 @@
-"""Supervised training: python -m unet_dynamic_blend.train --help."""
+"""Supervised training: python -m ai_blend.unet_dynamic_blend.train --help."""
 
 import argparse
 import json

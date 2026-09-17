@@ -35,7 +35,7 @@ cases with missing targets; other malformed cases stop processing.
 From the repository root:
 
 ```bash
-PYTHONPATH=src uv run python -m unet_dynamic_blend.train --epochs 20
+uv run python -m ai_blend.unet_dynamic_blend.train --epochs 20
 ```
 
 Options include `--data`, `--output`, `--base-channels`, `--scale`, `--lr`,
@@ -57,14 +57,14 @@ Batch size is 1 because image count and resolution can differ between cases.
 Single case (saves `output/unet_dynamic_blend/run_XXXX/ai_blend.jpg`):
 
 ```bash
-PYTHONPATH=src uv run python -m unet_dynamic_blend.predict \
+uv run python -m ai_blend.unet_dynamic_blend.predict \
   --case data/cases/YOUR_CASE
 ```
 
 All cases (saves `run_XXXX/<case>/ai_blend.jpg`):
 
 ```bash
-PYTHONPATH=src uv run python -m unet_dynamic_blend.predict --data data/cases
+uv run python -m ai_blend.unet_dynamic_blend.predict --data data/cases
 ```
 
 Defaults to the highest numbered completed checkpoint under
@@ -78,7 +78,7 @@ loaded during prediction. A malformed case stops the command; prior results stay
 
 ```python
 import torch
-from unet_dynamic_blend import DynamicUNetBlend
+from ai_blend.unet_dynamic_blend import DynamicUNetBlend
 
 model = DynamicUNetBlend(base_channels=16)
 images = torch.rand(1, 5, 3, 65, 97)  # batch, count, RGB, height, width

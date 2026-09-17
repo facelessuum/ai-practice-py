@@ -1,5 +1,7 @@
+from utils.utils import DEVICE
 from pathlib import Path
-
+from .model import ArNetDynamicModel
+import torch
 """Numbered runs and safeguards for read-only input data."""
 
 
@@ -9,6 +11,35 @@ def check_output(path: Path, input_root: Path) -> None:
         if resolved.is_relative_to(protected):
             raise ValueError(f"Save generated files outside input data: {path}")
 
+
+def load_model():
+
+    # Select the latest model
+    model_path = max(
+        Path("model").glob("arnet_blend/run_*/arnet_blend.pt"),
+        key=lambda path: int(path.parent.name.removeprefix("run_")),
+    )
+
+    checkpoint = torch.load(model_path, map_location=DEVICE, weights_only=True)
+    model = ArNetDynamicModel(checkpoint["base_channels"])
+    model.load_state_dict(checkpoint["weights"])
+    model.to(DEVICE).eval()
+    return model, checkpoint['scale']
+
+
+def get_output_fold(case: str | None = None) -> Path:
+    run_number = 1
+    output_path = Path("output")
+    while True:
+        run_fold = output_path / f"run_{run_number:04d}"
+        try:
+            run_fold.mkdir(parents=True)
+        except FileExistsError:
+            run_number += 1
+            continue
+        if case is None:
+            return run_fold / "ai_blend.jpg"
+        return run_fold / case / "ai_blend.jpg"
 
 def create_run(root: Path) -> Path:
     root.mkdir(parents=True, exist_ok=True)

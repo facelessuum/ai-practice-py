@@ -28,8 +28,10 @@ def blend_case(model, case: Path, destination: Path, scale: float = 0.1):
     with torch.inference_mode():
         output = model(images)[0]
     pixels = (
-        output.permute(1, 2, 0).clamp(0, 1).cpu().numpy() * 255
-    ).round().astype(np.uint8)
+        (output.permute(1, 2, 0).clamp(0, 1).cpu().numpy() * 255)
+        .round()
+        .astype(np.uint8)
+    )
     destination.parent.mkdir(parents=True, exist_ok=True)
     Image.fromarray(pixels).save(destination)
 
@@ -40,9 +42,15 @@ def main():
     source.add_argument("--case", type=Path, help="Predict one case")
     source.add_argument("--data", type=Path, help="Predict every case directory")
     parser.add_argument("--model", type=Path, help="Checkpoint; defaults to latest run")
-    parser.add_argument("--model-root", type=Path, default=Path("runs/unet_dynamic_blend"))
-    parser.add_argument("--output", type=Path, default=Path("output/unet_dynamic_blend"))
-    parser.add_argument("--scale", type=float, help="Default: checkpoint training scale")
+    parser.add_argument(
+        "--model-root", type=Path, default=Path("runs/unet_dynamic_blend")
+    )
+    parser.add_argument(
+        "--output", type=Path, default=Path("output/unet_dynamic_blend")
+    )
+    parser.add_argument(
+        "--scale", type=float, help="Default: checkpoint training scale"
+    )
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--threads", type=int, default=4)
     args = parser.parse_args()
@@ -56,15 +64,19 @@ def main():
     path = args.model if args.model is not None else latest_checkpoint(args.model_root)
     model, saved_scale = load_model(path, args.device)
     scale = saved_scale if args.scale is None else args.scale
-    cases = [args.case] if args.case is not None else sorted(
-        case for case in args.data.iterdir() if case.is_dir()
+    cases = (
+        [args.case]
+        if args.case is not None
+        else sorted(case for case in args.data.iterdir() if case.is_dir())
     )
     if not cases:
         parser.error("No case directories found")
     run = create_run(args.output)
     print(f"Using: {path}")
     for case in cases:
-        destination = (run if args.case is not None else run / case.name) / "ai_blend.jpg"
+        destination = (
+            run if args.case is not None else run / case.name
+        ) / "ai_blend.jpg"
         blend_case(model, case, destination, scale)
         print(f"Saved: {destination}", flush=True)
 

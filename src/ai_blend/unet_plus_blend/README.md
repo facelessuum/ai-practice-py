@@ -12,8 +12,8 @@ Run Python from the repository root with `PYTHONPATH=src`:
 
 ```python
 import torch
-from unet_plus_blend import UNetPlusBlend
-from unet_plus_blend.loss import blend_loss
+from ai_blend.unet_plus_blend import UNetPlusBlend
+from ai_blend.unet_plus_blend.loss import blend_loss
 
 model = UNetPlusBlend(base_channels=16, depth=3)
 images = torch.rand(1, 5, 3, 65, 97)  # batch, count, RGB, height, width
@@ -41,7 +41,7 @@ optimizer.step()
 ### Train
 
 ```bash
-PYTHONPATH=src uv run python -m unet_plus_blend.train --epochs 20 --depth 3
+uv run python -m ai_blend.unet_plus_blend.train --epochs 20 --depth 3
 ```
 
 Defaults: CPU, 16 base channels, learning rate 0.001, and 10% image scale.
@@ -61,10 +61,10 @@ counts; it does not randomly subsample exposures.
 
 ```bash
 # One case: output/unet_plus_blend/run_XXXX/ai_blend.jpg
-PYTHONPATH=src uv run python -m unet_plus_blend.predict --case data/cases/YOUR_CASE
+uv run python -m ai_blend.unet_plus_blend.predict --case data/cases/YOUR_CASE
 
 # All cases: output/unet_plus_blend/run_XXXX/<case>/ai_blend.jpg
-PYTHONPATH=src uv run python -m unet_plus_blend.predict --data data/cases
+uv run python -m ai_blend.unet_plus_blend.predict --data data/cases
 ```
 
 Prediction defaults to the highest numbered completed U-Net++ checkpoint and

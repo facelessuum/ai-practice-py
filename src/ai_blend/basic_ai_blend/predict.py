@@ -1,5 +1,5 @@
 from PIL import Image
-from app.dataset import load_inputs
+from .dataset import load_inputs
 from pathlib import Path
 import torch
 from .model import ArNet

@@ -1,11 +1,11 @@
 from time import perf_counter
-from app.model import ArNet
+from .model import ArNet
 from torch.utils.data import DataLoader
-from app.dataset import ExposureDataset
+from .dataset import ExposureDataset
 import torch
 from pathlib import Path
 import argparse
-from app.loss import exposure_loss
+from .loss import exposure_loss
 
 
 def main():

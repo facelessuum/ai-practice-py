@@ -1,7 +1,7 @@
 [project]
-name = "app"
+name = "AR-ML-PRACTICE"
 version = "0.1.0"
-description = "Add your description here"
+description = "Trying to learn ML"
 readme = "README.md"
 authors = [
     { name = "Arnold", email = "arnoldzkie22@gmail.com" }
@@ -16,18 +16,12 @@ dependencies = [
 
 [project.scripts]
 
-train-arnet-blend = "arnet_dynamic_blend.train:main"
-blend-arnet = "app.predict:blend_all"
-test = "app.test:main"
-test-dataset = "app.dataset:main"
-train-blend = "ai_guide.train:main"
-predict-blend = "ai_guide.predict:main"
-uv-blend = "ai_guide.blend_all:main"
-
-dataset = "ai_guide.dataset:load_inputs"
+train-arnet-blend = "ai_blend.arnet_dynamic_blend.train:main"
+predict-arnet-blendall = "ai_blend.arnet_dynamic_blend.interface:blend_all"
+predict-arnet-blend = "ai_blend.arnet_dynamic_blend.interface:blend_single_case"
 
 [tool.uv.build-backend]
-module-name = ["app", "ai_guide"]
+module-name = ["ai_blend", "utils"]
 
 [build-system]
 requires = ["uv_build>=0.12.0,<0.13.0"]
