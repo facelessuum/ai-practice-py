@@ -14,14 +14,20 @@ dependencies = [
     "torch>=2.13.0",
 ]
 
+[project.optional-dependencies]
+dashboard = ["tensorboard>=2.18"]
+
 [project.scripts]
+train-window-frame = "window_frame.ai_guide.training.train_model:main"
+evaluate-window-frame = "window_frame.ai_guide.evaluation.evaluate_model:main"
+predict-window-frame = "window_frame.ai_guide.prediction.enhance_image:main"
 
 train-arnet-blend = "ai_blend.arnet_dynamic_blend.train:main"
 predict-arnet-blendall = "ai_blend.arnet_dynamic_blend.interface:blend_all"
 predict-arnet-blend = "ai_blend.arnet_dynamic_blend.interface:blend_single_case"
 
 [tool.uv.build-backend]
-module-name = ["ai_blend", "utils"]
+module-name = ["ai_blend", "utils", "window_frame"]
 
 [build-system]
 requires = ["uv_build>=0.12.0,<0.13.0"]

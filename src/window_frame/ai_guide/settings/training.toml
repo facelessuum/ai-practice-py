@@ -1,0 +1,44 @@
+# Paths are relative to the directory where you run the command (use project root).
+[dataset]
+root = "datasets/window_frame/train"
+image_size = 512
+validation_fraction = 0.15
+test_fraction = 0.15
+# Optional JSON: {"00001": "property_a", "00002": "property_a", ...}
+scene_groups = ""
+# Set true ONLY after confirming existing IDs match README's class table.
+class_meanings_confirmed = false
+
+[model]
+base_channels = 32
+max_correction = 0.25
+confidence = 0.8
+
+[training]
+epochs = 40
+# Stop after this many joint-stage epochs without sufficient validation improvement.
+# 0 disables early stopping. Preparatory stages are never stopped early.
+early_stopping_patience = 5
+early_stopping_min_delta = 0.0001
+segmentation_epochs = 8
+enhancement_epochs = 8
+batch_size = 4
+learning_rate = 0.0003
+weight_decay = 0.0001
+# Auto balances CPU computation and image-loading workers.
+workers = "auto"
+cpu_threads = "auto"
+audit_workers = "auto"
+# GPU speed options (used only on CUDA).
+cudnn_benchmark = true
+allow_tf32 = true
+channels_last = true
+seed = 42
+device = "auto"
+mixed_precision = true
+accumulation_steps = 1
+# Requires: uv sync --extra dashboard
+tensorboard = false
+
+[output]
+root = "output/window_frame/ai_guide"
