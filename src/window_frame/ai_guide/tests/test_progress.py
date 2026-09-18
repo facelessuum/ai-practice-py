@@ -52,6 +52,13 @@ class ProgressTests(unittest.TestCase):
                 train_model.run_training(config)
             audit.assert_not_called()
 
+    def test_default_training_never_prompts(self):
+        with patch('sys.argv', ['train-window-frame']), \
+             patch('builtins.input', side_effect=AssertionError('Training must not prompt')), \
+             patch.object(train_model, 'run_training') as run:
+            train_model.main()
+        self.assertTrue(run.call_args.args[0]['dataset']['class_meanings_confirmed'])
+
     def test_confirmation_flag_records_choice(self):
         with patch('sys.argv', ['train-window-frame', '--confirm-labels']), \
              patch.object(train_model, 'run_training') as run:

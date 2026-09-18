@@ -2,7 +2,6 @@
 import argparse
 import json
 import math
-import sys
 from pathlib import Path
 import time
 import tomllib
@@ -255,20 +254,8 @@ def main():
     args = parser.parse_args()
     with args.config.open("rb") as stream:
         config = tomllib.load(stream)
-    if not args.audit_only and not config['dataset'].get('class_meanings_confirmed', False):
-        if args.confirm_labels:
-            config['dataset']['class_meanings_confirmed'] = True
-        elif sys.stdin.isatty():
-            print("\nBefore training, confirm your rail labels:")
-            print("  0 background | 1 clean neutral | 2 neutral | 3 wood | 4 dark | 5 protected")
-            print("  255 = unknown (ignored). This checks your intended label meanings, not just the numbers.")
-            try:
-                answer = input("Do your labels use these meanings? [y/N]: ").strip().lower()
-            except (EOFError, KeyboardInterrupt):
-                parser.exit(2, "\nTraining cancelled before dataset checking.\n")
-            if answer not in ('y', 'yes'):
-                parser.exit(2, "Training cancelled. Check your labels before confirming.\n")
-            config['dataset']['class_meanings_confirmed'] = True
+    if args.confirm_labels:
+        config['dataset']['class_meanings_confirmed'] = True
     try:
         run_training(config, args.resume, args.audit_only)
     except ValueError as error:

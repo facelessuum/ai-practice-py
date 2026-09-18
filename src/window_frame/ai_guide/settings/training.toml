@@ -6,8 +6,8 @@ validation_fraction = 0.15
 test_fraction = 0.15
 # Optional JSON: {"00001": "property_a", "00002": "property_a", ...}
 scene_groups = ""
-# Set true ONLY after confirming existing IDs match README's class table.
-class_meanings_confirmed = false
+# Current dataset mapping has been reviewed and confirmed by the user.
+class_meanings_confirmed = true
 
 [model]
 base_channels = 32

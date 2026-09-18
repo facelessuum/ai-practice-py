@@ -102,19 +102,13 @@ Initial read-only audit of the current dataset found:
 
 This is not a manual assessment of annotation quality or confirmation of class names.
 
-When you start training in a terminal, the command shows the class mapping and asks you to confirm it **before** scanning the dataset. Answer `y` only if those meanings are correct. Declining cancels cleanly without training.
-
-For a non-interactive run, explicitly acknowledge the mapping:
+The current dataset mapping has been reviewed and confirmed by the user. The default settings already contain `class_meanings_confirmed = true`. Training does not ask any yes/no questions:
 
 ```bash
-uv run train-window-frame --confirm-labels
+uv run train-window-frame
 ```
 
-The confirmation is saved in that run's copied settings. To avoid the prompt on future runs, after confirming the class meanings, edit `settings/training.toml`:
-
-```toml
-class_meanings_confirmed = true
-```
+Older custom settings with `class_meanings_confirmed = false` still need that value updated, or the existing `--confirm-labels` flag. File and label-validity checks remain enabled.
 
 ## 3. Keep similar scenes together
 
