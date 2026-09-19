@@ -1,14 +1,18 @@
 """Versioned checkpoints, atomic saves, and sidecar metadata."""
 import random
+import shutil
+from dataclasses import asdict
 from pathlib import Path
 import numpy as np
 import torch
 from ..model.window_frame_model import WindowFrameModel, CLASS_NAMES
-from ..run_history.record_run_details import write_json, file_hash, environment
+from ..run_history.record_run_details import environment
+from ..utils.save_files import write_json, file_hash
 
 
 def save_checkpoint(path, model, optimizer, epoch, best_score, config, split, metrics, generator,
                     early_stopping=None):
+    config = asdict(config)
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     rng = dict(python=random.getstate(), numpy=np.random.get_state(), torch=torch.get_rng_state(),
@@ -25,6 +29,16 @@ def save_checkpoint(path, model, optimizer, epoch, best_score, config, split, me
         sha256=file_hash(path), model_settings=model.settings, config=config, metrics=metrics,
         class_names=CLASS_NAMES, environment=provenance, early_stopping=early_stopping,
         training_run=str(path.parent.parent)))
+
+
+def copy_checkpoint(source, destination):
+    """Promote a saved checkpoint in the same run without serializing it again."""
+    source, destination = Path(source), Path(destination)
+    for suffix in (".pt", ".json"):
+        target = destination.with_suffix(suffix)
+        temporary = target.with_suffix(suffix + ".tmp")
+        shutil.copyfile(source.with_suffix(suffix), temporary)
+        temporary.replace(target)
 
 
 def load_checkpoint(path, device="cpu"):

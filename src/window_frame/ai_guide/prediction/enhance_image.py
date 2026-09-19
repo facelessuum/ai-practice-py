@@ -9,7 +9,8 @@ from ..dataset.prepare_images import image_tensor
 from ..model.window_frame_model import compose
 from ..training.save_and_load import load_checkpoint
 from ..run_history.create_run_folder import create_run, DEFAULT_OUTPUT
-from ..run_history.record_run_details import choose_device, write_json, file_hash
+from ..utils.save_files import write_json, file_hash
+from ..utils.setup_device import choose_device
 from .save_results import save_results
 from .process_large_image import process_large_image
 
@@ -19,15 +20,19 @@ def predict_image(model, image, size, device, mode="tiled", overlap=None):
     """Return original-size CPU outputs; training size controls crop size only."""
     if size < 16:
         raise ValueError("Prediction size must be at least 16")
-    original = image_tensor(image.convert("RGB")).unsqueeze(0)
+    image = image.convert("RGB")
+    original = image_tensor(image).unsqueeze(0)
     if mode == "tiled":
         overlap = size // 4 if overlap is None else overlap
         probabilities, soft_mask, residual = process_large_image(model, original, size, overlap, device)
     elif mode == "resized":
-        resized = image_tensor(image.convert("RGB").resize((size, size), Image.Resampling.BILINEAR)).unsqueeze(0).to(device)
+        resized = image_tensor(image.resize((size, size), Image.Resampling.BILINEAR)).unsqueeze(0).to(device)
         prediction = model(resized)
         dimensions = original.shape[-2:]
-        resize = lambda x: F.interpolate(x.float().cpu(), size=dimensions, mode="bilinear", align_corners=False)
+
+        def resize(tensor):
+            return F.interpolate(tensor.float().cpu(), size=dimensions, mode="bilinear", align_corners=False)
+
         probabilities = resize(prediction["class_logits"]).softmax(1)
         soft_mask = resize(prediction["mask_logits"]).sigmoid()
         residual = resize(prediction["residual"])
@@ -47,14 +52,22 @@ def run_prediction(checkpoint, source, output_root=DEFAULT_OUTPUT, device="auto"
             raise ValueError("confidence must be in (0, 1]")
         model.settings["confidence"] = confidence
     source = Path(source)
-    paths = sorted(p for p in source.iterdir() if p.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"}) if source.is_dir() else [source]
+    if source.is_dir():
+        extensions = {".jpg", ".jpeg", ".png", ".webp"}
+        paths = sorted(path for path in source.iterdir() if path.suffix.lower() in extensions)
+    else:
+        paths = [source]
     if not paths:
         raise ValueError("No supported images found")
     run, logger = create_run("predictions", output_root)
     identity = dict(path=str(Path(checkpoint).resolve()), sha256=file_hash(checkpoint), epoch=state["epoch"]+1)
+    size = state["config"]["dataset"]["image_size"]
+    if mode != "tiled":
+        overlap = None
+    elif overlap is None:
+        overlap = size // 4
     write_json(run / "settings.json", dict(checkpoint=identity, device=str(device), model=model.settings,
-        tile_size=state["config"]["dataset"]["image_size"], prediction_mode=mode,
-        overlap=(state["config"]["dataset"]["image_size"] // 4 if overlap is None else overlap) if mode == "tiled" else None))
+        tile_size=size, prediction_mode=mode, overlap=overlap))
     successful, failures = [], []
     for index, path in enumerate(paths):
         try:
@@ -63,7 +76,6 @@ def run_prediction(checkpoint, source, output_root=DEFAULT_OUTPUT, device="auto"
             if device.type == "cuda":
                 torch.cuda.synchronize(device)
             start = time.perf_counter()
-            size = state["config"]["dataset"]["image_size"]
             result = predict_image(model, image, size, device, mode, overlap)
             if device.type == "cuda":
                 torch.cuda.synchronize(device)
@@ -72,8 +84,7 @@ def run_prediction(checkpoint, source, output_root=DEFAULT_OUTPUT, device="auto"
             save_results(folder, image, result, dict(source=str(path.resolve()), source_sha256=file_hash(path),
                 checkpoint=identity, inference_seconds=seconds, device=str(device), width=image.width,
                 height=image.height, confidence_threshold=model.settings["confidence"],
-                prediction_mode=mode, tile_size=size,
-                overlap=(size // 4 if overlap is None else overlap) if mode == "tiled" else None))
+                prediction_mode=mode, tile_size=size, overlap=overlap))
             successful.append(folder.name)
             logger.info("Saved %s (%.3fs)", folder.name, seconds)
         except (OSError, ValueError) as error:

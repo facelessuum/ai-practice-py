@@ -22,13 +22,13 @@ def available_cpu_count():
 
 def resource_plan(training, device_type, available=None):
     available = available_cpu_count() if available is None else max(1, available)
-    workers = training.get('workers', 'auto')
+    workers = training.workers
     if workers == 'auto':
         workers = min(8, max(0, available - 1)) if device_type == 'cuda' else min(4, available // 4)
-    threads = training.get('cpu_threads', 'auto')
+    threads = training.cpu_threads
     if threads == 'auto':
         threads = min(4, available) if device_type == 'cuda' else max(1, available - workers)
-    audit_workers = training.get('audit_workers', 'auto')
+    audit_workers = training.audit_workers
     if audit_workers == 'auto':
         audit_workers = min(8, available)
     for name, value, minimum in [('workers', workers, 0), ('cpu_threads', threads, 1),
@@ -42,9 +42,9 @@ def resource_plan(training, device_type, available=None):
 def configure_hardware(training, device, plan):
     torch.set_num_threads(plan['cpu_threads'])
     cuda = device.type == 'cuda'
-    benchmark = cuda and training.get('cudnn_benchmark', True)
+    benchmark = cuda and training.cudnn_benchmark
     torch.backends.cudnn.benchmark = benchmark
-    tf32 = cuda and training.get('allow_tf32', True)
+    tf32 = cuda and training.allow_tf32
     torch.backends.cuda.matmul.allow_tf32 = tf32
     torch.backends.cudnn.allow_tf32 = tf32
     return dict(**plan, device=str(device), torch_threads=torch.get_num_threads(),
@@ -52,5 +52,5 @@ def configure_hardware(training, device, plan):
                 cudnn_benchmark=benchmark, allow_tf32=tf32,
                 gpu_name=torch.cuda.get_device_name(device) if cuda else None,
                 gpu_total_bytes=torch.cuda.get_device_properties(device).total_memory if cuda else None,
-                batch_size=training['batch_size'], prefetch_factor=2 if plan['workers'] else None,
-                channels_last=cuda and training.get('channels_last', True))
+                batch_size=training.batch_size, prefetch_factor=2 if plan['workers'] else None,
+                channels_last=cuda and training.channels_last)

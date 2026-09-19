@@ -3,7 +3,8 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
-from .record_run_details import environment, write_json
+from .record_run_details import environment
+from ..utils.save_files import write_json
 
 DEFAULT_OUTPUT = "output/window_frame/ai_guide"
 

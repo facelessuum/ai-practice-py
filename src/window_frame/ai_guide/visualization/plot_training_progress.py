@@ -8,7 +8,7 @@ def open_dashboard(folder, enabled=True):
     try:
         from torch.utils.tensorboard import SummaryWriter
     except ImportError:
-        raise RuntimeError("Install the dashboard extra, or set tensorboard=false in training.toml") from None
+        raise RuntimeError("Install the dashboard extra, or set tensorboard=False in TrainingConfig in utils/settings.py") from None
     return SummaryWriter(str(folder))
 
 

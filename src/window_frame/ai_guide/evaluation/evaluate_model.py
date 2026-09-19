@@ -8,9 +8,10 @@ from torch.utils.data import DataLoader
 from ..dataset.load_samples import WindowFrameDataset
 from ..dataset.check_labels import audit_dataset
 from ..training.save_and_load import load_checkpoint
-from ..training.train_model import to_device
+from ..utils.prepare_batches import to_device
 from ..run_history.create_run_folder import create_run, DEFAULT_OUTPUT
-from ..run_history.record_run_details import choose_device, write_json, file_hash
+from ..utils.save_files import write_json, file_hash
+from ..utils.setup_device import choose_device
 from ..visualization.compare_images import compare_images, to_image
 from ..visualization.draw_rail_guide import draw_rail_guide
 from ..visualization.plot_evaluation_results import plot_evaluation_results

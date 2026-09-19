@@ -2,7 +2,7 @@
 import numpy as np
 from PIL import Image
 from ..model.window_frame_model import CLASS_NAMES
-from ..run_history.record_run_details import write_json, file_hash
+from ..utils.save_files import write_json, file_hash
 from ..visualization.compare_images import to_image, compare_images
 from ..visualization.draw_rail_guide import draw_rail_guide, confidence_image
 
@@ -28,14 +28,19 @@ def save_results(folder, original, result, metadata):
     confidence_image(confidence).save(folder / "class_confidence.png")
     compare_images({"Input": original, "Enhanced": enhanced}, folder / "comparison.png")
     changed = np.any(np.asarray(original) != np.asarray(enhanced), axis=-1)
+    class_metrics = {}
+    for i, name in enumerate(CLASS_NAMES):
+        selected = labels == i
+        pixels = int(selected.sum())
+        class_metrics[name] = dict(pixels=pixels,
+            mean_confidence=float(confidence[selected].mean()) if pixels else None)
+    frame_detected = bool(mask.any())
     # Numerical certainty, not a calibrated probability that the whole output is correct.
-    metadata.update(frame_detected=bool(mask.any()), frame_area_fraction=float(mask.mean()),
+    metadata.update(frame_detected=frame_detected, frame_area_fraction=float(mask.mean()),
         edited_area_fraction=float(changed.mean()), allowed_edit_fraction=float((gate > 0).mean()),
         mean_frame_probability=float(soft.mean()),
-        mean_class_confidence_on_frames=float(confidence[mask].mean()) if mask.any() else None,
-        classes={name: dict(pixels=int((labels == i).sum()),
-            mean_confidence=float(confidence[labels == i].mean()) if (labels == i).any() else None)
-            for i, name in enumerate(CLASS_NAMES)},
+        mean_class_confidence_on_frames=float(confidence[mask].mean()) if frame_detected else None,
+        classes=class_metrics,
         confidence_note="Uncalibrated pixel confidence; not an enhancement-quality score or image-level presence probability.",
         warnings=["Predicted protection can fail when classification is wrong.",
                   "Tiled inference limits scene context; resized inference can lose thin rails. Validate quality on large photos."],

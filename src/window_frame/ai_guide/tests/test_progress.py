@@ -1,7 +1,7 @@
+from window_frame.ai_guide.utils.settings import Settings, DatasetConfig, ModelConfig, TrainingConfig, OutputConfig
 import io
 import logging
 import tempfile
-import tomllib
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -44,9 +44,8 @@ class ProgressTests(unittest.TestCase):
         self.assertNotIn('\r', stream.getvalue())
 
     def test_missing_confirmation_fails_before_audit(self):
-        with train_model.DEFAULT_CONFIG.open('rb') as stream:
-            config = tomllib.load(stream)
-        config['dataset']['class_meanings_confirmed'] = False
+        config = Settings()
+        config.dataset.class_meanings_confirmed = False
         with patch.object(train_model, 'audit_dataset') as audit:
             with self.assertRaisesRegex(ValueError, '--confirm-labels'):
                 train_model.run_training(config)
@@ -57,10 +56,10 @@ class ProgressTests(unittest.TestCase):
              patch('builtins.input', side_effect=AssertionError('Training must not prompt')), \
              patch.object(train_model, 'run_training') as run:
             train_model.main()
-        self.assertTrue(run.call_args.args[0]['dataset']['class_meanings_confirmed'])
+        self.assertTrue(run.call_args.args[0].dataset.class_meanings_confirmed)
 
     def test_confirmation_flag_records_choice(self):
         with patch('sys.argv', ['train-window-frame', '--confirm-labels']), \
              patch.object(train_model, 'run_training') as run:
             train_model.main()
-        self.assertTrue(run.call_args.args[0]['dataset']['class_meanings_confirmed'])
+        self.assertTrue(run.call_args.args[0].dataset.class_meanings_confirmed)

@@ -8,6 +8,25 @@ from PIL import Image
 from .load_samples import input_path
 
 
+def discover_samples(root):
+    """Return the minimum sample metadata needed when validation is skipped."""
+    root = Path(root)
+    samples = []
+    for folder in sorted(p for p in root.iterdir() if p.is_dir()):
+        path = input_path(folder)
+        with Image.open(path) as image:
+            source = np.asarray(image.convert("RGB"))
+        samples.append(dict(
+            id=folder.name,
+            empty=None,
+            input_hash=hashlib.sha256(source.tobytes() + str(source.shape).encode()).hexdigest(),
+            files={},
+        ))
+    if not samples:
+        raise ValueError("No sample folders found")
+    return samples
+
+
 def check_sample(folder):
     """Each worker owns its images and returns a small summary, not image arrays."""
     try:
@@ -15,7 +34,6 @@ def check_sample(folder):
         images = []
         for path in paths:
             with Image.open(path) as image:
-                image.load()
                 images.append(image.copy())
         if len({im.size for im in images}) != 1:
             raise ValueError('Image/label dimensions differ')
