@@ -8,7 +8,6 @@ This is a working training pipeline, **not an already-trained model**. Good boun
 
 | Folder | Purpose |
 | --- | --- |
-| `settings/` | Settings you can change between experiments |
 | `dataset/` | Read, check, and split examples |
 | `model/` | Your model and its building blocks |
 | `training/` | Teach the model, calculate mistakes, save progress |
@@ -16,6 +15,7 @@ This is a working training pipeline, **not an already-trained model**. Good boun
 | `prediction/` | Enhance new photos and save outputs |
 | `visualization/` | Colored guides, comparisons, and training charts |
 | `run_history/` | Separate run folders, settings, logs, and file identities |
+| `utils/` | Editable settings and shared helpers for checking settings, preparing batches, and saving files |
 | `tests/` | Small automated checks using artificial examples |
 
 The model has one shared image-reading section and two branches: one learns where/what the frames are; the other learns small RGB corrections. A separate mask head allows frame-location supervision when a material label is unknown. The default widths are 32, 64, 128, and 256. You don't need to change these to start.
@@ -127,7 +127,7 @@ The existing `datasets/window_frame/test/` contains photos without paired labels
 ## 4. Train
 
 ```bash
-train-window-frame --config src/window_frame/ai_guide/settings/training.toml
+train-window-frame
 ```
 
 For a quick small-data test without moving photos:
@@ -138,13 +138,13 @@ uv run train-window-frame --epochs 5 --max-train-samples 50 --max-validation-sam
 
 These limits select reproducible subsets after splitting; the held-out test split is unchanged. The chosen examples and effective settings are saved in the run. The initial audit still checks the full dataset. Limits are maximums, so a smaller split uses all its available examples. To resume a limited run, use the same sample-limit arguments and increase `--epochs` to the desired total (not additional) epoch count.
 
-**Five epochs with the default stage settings only train detection/classification.** To exercise all stages in a five-epoch smoke test, use a separate config with `segmentation_epochs=1` and `enhancement_epochs=1`. A 50-example run is a pipeline check, not evidence of production quality.
+The default settings train all tasks together from epoch 1 (`segmentation_epochs=0`, `enhancement_epochs=0`). A 50-example run is a pipeline check, not evidence of production quality.
 
-The default schedule is:
+For staged training, set `segmentation_epochs` and `enhancement_epochs` above zero:
 
-1. Eight epochs learning frame locations and classes.
-2. Eight epochs adding enhancement using known frame locations. Location/class learning continues.
-3. Remaining epochs learning enhancement with predicted locations/classes.
+1. Learn frame locations and classes.
+2. Add enhancement using known frame locations, while continuing location/class learning.
+3. Learn all tasks together using predicted locations/classes for the remaining epochs.
 
 An epoch is one pass through the training examples. Validation examples are used to check progress, not to update the model.
 
@@ -162,8 +162,20 @@ Useful settings:
 - `max_correction`: largest possible RGB correction, with colors scaled from 0 to 1.
 - `base_channels`: model width; 8 for tiny tests, 32 as a practical starting point.
 - `mixed_precision`: uses BF16 on supported CUDA hardware to reduce memory.
+- `skip_audit`: boolean; set to `True` to skip the dataset audit or `False` to run it (input images are still read and hashed when skipping).
 
-Save alternative settings under `settings/` so experiments are repeatable. The effective settings are also copied into every run.
+Edit `utils/settings.py` to change the defaults. It defines `DatasetConfig`, `ModelConfig`, `TrainingConfig`, and `OutputConfig`, grouped in one exported `settings` instance:
+
+```python
+from window_frame.ai_guide.utils.settings import settings
+
+print(settings.training.epochs)
+print(settings.dataset.root)
+```
+
+Use Python values (`True`, `False`, and `None`). Set sample limits to `None` to use all examples. Training uses `config = settings`, with no configuration copy. CLI flags update that instance for the current process; they do not edit the settings file. If you call `main()` repeatedly in one Python process, those overrides remain in effect. For separate experiments in Python, pass a fresh `Settings()` to `run_training()`. Effective settings are saved as dictionaries in run metadata and checkpoints. TOML files and the `--config` option are no longer used.
+
+Start reading at `training/train_model.py`: `main()` reads arguments, then `run_training()` sets up the data and model, trains, validates, and saves each epoch. Helpers live in `utils/check_settings.py` (settings and resume checks), `utils/prepare_batches.py` (sample limits, loaders, and device transfers), and `utils/save_examples.py` (validation examples). Shared JSON writing and file hashing are in `utils/save_files.py`; device selection and random seeds are in `utils/setup_device.py`. The loss calculation is in `training/calculate_loss.py`.
 
 ### Automatic CPU/GPU performance settings
 
@@ -182,13 +194,14 @@ GPU speed options can change numerical results slightly. Disable `allow_tf32` an
 
 Progress now shows both the current-pass ETA and `all epochs ~...`: an estimate for the entire remaining planned run, including validation. The first estimate is rough (it assumes similar batch times); after a complete epoch it uses recent measured epoch durations, including checkpoint saving. Later training stages can take longer, so estimates will change. The estimate assumes all planned epochs run; it cannot predict when early stopping will trigger.
 
-```toml
-[training]
-early_stopping_patience = 5
-early_stopping_min_delta = 0.0001
+In `TrainingConfig` in `utils/settings.py`:
+
+```python
+early_stopping_patience: int = 5
+early_stopping_min_delta: float = 0.0001
 ```
 
-These settings stop training after five consecutive monitored epochs without a validation-loss decrease greater than 0.0001. Set patience to `0` to disable early stopping. The first two preparatory stages always finish; monitoring starts fresh at the final joint stage. With the default 8+8 preparatory epochs, monitoring begins at epoch 17. If your run ends before the joint stage, early stopping never activates.
+These settings stop training after five consecutive monitored epochs without a validation-loss decrease greater than 0.0001. Set patience to `0` to disable early stopping. The first two preparatory stages always finish; monitoring starts fresh at the final joint stage. With the current defaults, monitoring begins at epoch 1. If you enable preparatory stages and your run ends before the joint stage, early stopping never activates.
 
 Stopping still saves `last.pt` and preserves `best.pt`. `summary.json` records why training ended; history and checkpoints record the patience counter. Compatible resumed checkpoints restore that counter. Older checkpoints without it start a fresh counter. Changing the patience or minimum improvement resets the counter deliberately; an already-stopped checkpoint will ask you to change/disable the policy before continuing.
 
@@ -197,7 +210,7 @@ Changes do not affect a process already running. Let the current epoch finish so
 ### Resume
 
 ```bash
-train-window-frame --config src/window_frame/ai_guide/settings/training.toml \
+train-window-frame \
   --resume output/window_frame/ai_guide/training/RUN/checkpoints/last.pt
 ```
 
