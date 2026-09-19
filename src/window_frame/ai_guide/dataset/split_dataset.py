@@ -32,12 +32,17 @@ def split_dataset(samples, seed=42, validation_fraction=0.15, test_fraction=0.15
     if len(groups) < 3:
         raise ValueError("At least three independent groups are required")
     random.Random(seed).shuffle(groups)
-    n = len(groups)
-    nv, nt = max(1, round(n * validation_fraction)), max(1, round(n * test_fraction))
-    if nv + nt >= n:
-        nv = nt = 1
-    flatten = lambda groups: sorted(x for group in groups for x in group)
-    return dict(train=flatten(groups[nv + nt:]), validation=flatten(groups[:nv]),
-                test=flatten(groups[nv:nv + nt]), seed=seed,
+    group_count = len(groups)
+    validation_count = max(1, round(group_count * validation_fraction))
+    test_count = max(1, round(group_count * test_fraction))
+    if validation_count + test_count >= group_count:
+        validation_count = test_count = 1
+
+    def sample_ids(selected_groups):
+        return sorted(sample_id for group in selected_groups for sample_id in group)
+
+    test_end = validation_count + test_count
+    return dict(train=sample_ids(groups[test_end:]), validation=sample_ids(groups[:validation_count]),
+                test=sample_ids(groups[validation_count:test_end]), seed=seed,
                 grouping="scene+exact_pixels" if scene_groups is not None else "exact_pixels_only",
                 warning="Without scene IDs, near-duplicate leakage remains possible.")

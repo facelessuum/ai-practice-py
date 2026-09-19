@@ -6,7 +6,7 @@ from PIL import Image, ImageOps
 
 
 def image_tensor(image):
-    array = np.asarray(image, dtype=np.float32).copy() / 255.0
+    array = np.asarray(image, dtype=np.float32) / 255.0
     if array.ndim == 2:
         array = array[..., None]
     return torch.from_numpy(array).permute(2, 0, 1)

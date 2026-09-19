@@ -11,10 +11,13 @@ def region_mean(values, region):
 def calculate_loss(result, batch, stage="joint"):
     image, target = batch["image"], batch["target"]
     classes, mask = batch["classes"], batch["mask"]
-    valid = classes != 255
     ce = F.cross_entropy(result["class_logits"], classes, ignore_index=255, reduction="none")
     # Average observed classes equally, rather than allowing background to dominate.
-    terms = [ce[classes == i].mean() for i in range(6) if (classes == i).any()]
+    terms = []
+    for class_id in range(6):
+        selected = classes == class_id
+        if selected.any():
+            terms.append(ce[selected].mean())
     class_loss = torch.stack(terms).mean() if terms else result["class_logits"].sum() * 0
     bce = F.binary_cross_entropy_with_logits(result["mask_logits"], mask, reduction="none")
     foreground = mask > 0.05
