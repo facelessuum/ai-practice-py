@@ -130,6 +130,16 @@ The existing `datasets/window_frame/test/` contains photos without paired labels
 train-window-frame --config src/window_frame/ai_guide/settings/training.toml
 ```
 
+For a quick small-data test without moving photos:
+
+```bash
+uv run train-window-frame --epochs 5 --max-train-samples 50 --max-validation-samples 10
+```
+
+These limits select reproducible subsets after splitting; the held-out test split is unchanged. The chosen examples and effective settings are saved in the run. The initial audit still checks the full dataset. Limits are maximums, so a smaller split uses all its available examples. To resume a limited run, use the same sample-limit arguments and increase `--epochs` to the desired total (not additional) epoch count.
+
+**Five epochs with the default stage settings only train detection/classification.** To exercise all stages in a five-epoch smoke test, use a separate config with `segmentation_epochs=1` and `enhancement_epochs=1`. A 50-example run is a pipeline check, not evidence of production quality.
+
 The default schedule is:
 
 1. Eight epochs learning frame locations and classes.
@@ -206,7 +216,7 @@ Every training run has:
 - `run.log`: readable progress and failures.
 - `history.json`: epoch losses, timing, and validation measurements.
 - `loss.svg`: a chart readable in a browser, without extra dependencies.
-- `visualizations/`: input, target, prediction, and mask comparisons.
+- `visualizations/`: five distinct validation examples per epoch (or all available if fewer than five), each comparing input, target, prediction, and masks. Selection rotates reproducibly through the validation split; images repeat once the pool is exhausted. Filenames include the epoch and sample ID. TensorBoard also receives each selected comparison when enabled.
 - `checkpoints/best.pt` and `last.pt`, each with a JSON metadata sidecar.
 
 Training loss can jump when the training stage changes, because new objectives are introduced. Validation uses a fixed objective to keep checkpoint selection comparable.

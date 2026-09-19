@@ -1,2 +1,48 @@
+
+# Paths are relative to the directory where you run the command (use project root).
 [dataset]
 root = "datasets/window_frame/train"
+# Common image formats. The loader does not yet use this setting.
+image_type = ["jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff", "avif"]
+image_size = 512
+validation_fraction = 0.15
+test_fraction = 0.15
+# Optional JSON: {"00001": "property_a", "00002": "property_a", ...}
+scene_groups = ""
+# Current dataset mapping has been reviewed and confirmed by the user.
+class_meanings_confirmed = true
+
+[model]
+base_channels = 16
+max_correction = 0.25
+confidence = 0.8
+
+[training]
+epochs = 20
+# Stop after this many joint-stage epochs without sufficient validation improvement.
+# 0 disables early stopping. Preparatory stages are never stopped early.
+early_stopping_patience = 3
+early_stopping_min_delta = 0.0002
+segmentation_epochs = 10
+enhancement_epochs = 10
+batch_size = 5
+learning_rate = 0.0002
+weight_decay = 0.0001
+# Auto balances CPU computation and image-loading workers.
+workers = "auto"
+cpu_threads = "auto"
+audit_workers = "auto"
+# GPU speed options (used only on CUDA).
+cudnn_benchmark = true
+allow_tf32 = true
+channels_last = true
+seed = 42
+device = "auto"
+mixed_precision = true
+accumulation_steps = 1
+# Requires: uv sync --extra dashboard
+tensorboard = false
+
+[output]
+root = "output/window_frame/ai_guide"
+

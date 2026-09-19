@@ -2,6 +2,7 @@
 import argparse
 import json
 import math
+import random
 from pathlib import Path
 import time
 import tomllib
@@ -36,6 +37,10 @@ def validate_config(config):
     for key in ("epochs", "batch_size", "accumulation_steps"):
         if training[key] < 1:
             raise ValueError(f"{key} must be positive")
+    for key in ('max_train_samples', 'max_validation_samples'):
+        limit = training.get(key)
+        if limit is not None and (not isinstance(limit, int) or isinstance(limit, bool) or limit < 1):
+            raise ValueError(f'{key} must be a positive integer')
     if data["image_size"] < 16:
         raise ValueError("image_size must be >=16")
     resource_plan(training, "cpu")
@@ -44,6 +49,24 @@ def validate_config(config):
         raise ValueError("confidence and max_correction must be in (0, 1]")
     if min(training["segmentation_epochs"], training["enhancement_epochs"]) < 0:
         raise ValueError("Stage lengths cannot be negative")
+
+
+def limit_samples(split, training):
+    """Select reproducible small subsets after leakage-safe splitting."""
+    split = dict(split)
+    for name, setting in [('train', 'max_train_samples'), ('validation', 'max_validation_samples')]:
+        limit = training.get(setting)
+        if limit is not None and limit < len(split[name]):
+            split[name] = sorted(random.Random(training['seed']).sample(split[name], limit))
+    return split
+
+
+def visualization_ids(sample_ids, epoch, seed):
+    """Rotate through a reproducible order without changing training randomness."""
+    ids = list(sample_ids)
+    random.Random(seed).shuffle(ids)
+    count = min(5, len(ids))
+    return {ids[(epoch * count + i) % len(ids)] for i in range(count)}
 
 
 def run_training(config, resume=None, audit_only=False):
@@ -82,6 +105,9 @@ def run_training(config, resume=None, audit_only=False):
         for key in ("segmentation_epochs", "enhancement_epochs", "batch_size", "accumulation_steps", "seed"):
             if state["config"]["training"][key] != training[key]:
                 raise ValueError(f"Resume requires the same {key}")
+        for key in ('max_train_samples', 'max_validation_samples'):
+            if state['config']['training'].get(key) != training.get(key):
+                raise ValueError(f'Resume requires the same {key}; start a new experiment to change sample limits')
         original_audit = Path(resume).resolve().parent.parent / "dataset_audit.json"
         if not original_audit.exists() or json.loads(original_audit.read_text())["samples"] != report["samples"]:
             raise ValueError("Cannot verify unchanged dataset against the original audit")
@@ -89,6 +115,10 @@ def run_training(config, resume=None, audit_only=False):
         write_json(run / "resumed_from.json", dict(path=str(Path(resume).resolve()), sha256=file_hash(resume)))
     else:
         model = WindowFrameModel(**config["model"]).to(device)
+    if not state:
+        split = limit_samples(split, training)
+    logger.info('Using %d training, %d validation, %d held-out test examples',
+                len(split['train']), len(split['validation']), len(split['test']))
     if hardware['channels_last']:
         model = model.to(memory_format=torch.channels_last)
     write_json(run / "dataset_split.json", split)
@@ -169,6 +199,7 @@ def run_training(config, resume=None, audit_only=False):
             model.eval()
             meter = AccuracyMeter()
             val_total, val_examples = 0.0, 0
+            selected_ids = visualization_ids(split['validation'], epoch, training['seed'])
             progress = Progress(f"Epoch {epoch+1}/{training['epochs']} validation", logger, len(loaders['validation']))
             with torch.inference_mode():
                 for index, batch in enumerate(loaders["validation"]):
@@ -182,14 +213,17 @@ def run_training(config, resume=None, audit_only=False):
                     progress.update(index+1, loss=val_total/val_examples,
                                     remaining_seconds=remaining_time.estimate(epoch, time.perf_counter()-epoch_start,
                                                                               len(loaders['train'])+index+1))
-                    if index == 0:
-                        comparison = compare_images({"Input": to_image(batch["image"][0]),
-                            "Target": to_image(batch["target"][0]), "Enhanced": to_image(result["enhanced"][0]),
-                            "True mask": to_image(batch["mask"][0]), "Soft mask": to_image(result["soft_mask"][0])},
-                            run / "visualizations" / f"epoch_{epoch+1:04d}.png")
+                    for i, sample_id in enumerate(batch['id']):
+                        if sample_id not in selected_ids:
+                            continue
+                        comparison = compare_images({"Input": to_image(batch["image"][i]),
+                            "Target": to_image(batch["target"][i]), "Enhanced": to_image(result["enhanced"][i]),
+                            "True mask": to_image(batch["mask"][i]), "Soft mask": to_image(result["soft_mask"][i])},
+                            run / "visualizations" / f"epoch_{epoch+1:04d}_{sample_id}.png")
                         if dashboard:
                             import numpy as np
-                            dashboard.add_image("validation/comparison", np.asarray(comparison), epoch+1, dataformats="HWC")
+                            dashboard.add_image(f"validation/comparison/{sample_id}", np.asarray(comparison),
+                                                epoch+1, dataformats="HWC")
             progress.close()
             metrics = meter.compute()
             row = dict(epoch=epoch+1, stage=stage, train_loss=total/examples,
@@ -248,12 +282,19 @@ def main():
     parser = argparse.ArgumentParser(description="Train your window-frame model from scratch")
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     parser.add_argument("--resume", type=Path)
+    parser.add_argument('--epochs', type=int, help='Override the total epoch count')
+    parser.add_argument('--max-train-samples', type=int, help='Use at most this many training examples')
+    parser.add_argument('--max-validation-samples', type=int, help='Use at most this many validation examples')
     parser.add_argument("--audit-only", action="store_true")
     parser.add_argument("--confirm-labels", action="store_true",
                         help="Confirm IDs: 0 background, 1 clean neutral, 2 neutral, 3 wood, 4 dark, 5 protected")
     args = parser.parse_args()
     with args.config.open("rb") as stream:
         config = tomllib.load(stream)
+    for key in ('epochs', 'max_train_samples', 'max_validation_samples'):
+        value = getattr(args, key)
+        if value is not None:
+            config['training'][key] = value
     if args.confirm_labels:
         config['dataset']['class_meanings_confirmed'] = True
     try:

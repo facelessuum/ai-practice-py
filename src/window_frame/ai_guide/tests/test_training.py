@@ -18,8 +18,8 @@ class TrainingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             data = root / 'data'
-            make_dataset(data)
-            config = dict(dataset=dict(root=str(data), image_size=32, validation_fraction=.2,
+            make_dataset(data, count=12)
+            config = dict(dataset=dict(root=str(data), image_size=32, validation_fraction=.5,
                 test_fraction=.2, scene_groups='', class_meanings_confirmed=True),
                 model=dict(base_channels=8, max_correction=.25, confidence=.8),
                 training=dict(epochs=1, segmentation_epochs=0, enhancement_epochs=0, batch_size=2,
@@ -27,6 +27,8 @@ class TrainingTests(unittest.TestCase):
                     mixed_precision=False, accumulation_steps=2, tensorboard=False),
                 output=dict(root=str(root / 'runs')))
             run = run_training(config)
+            comparisons = list((run / 'visualizations').glob('epoch_0001_*.png'))
+            self.assertEqual(len(comparisons), 5)
             checkpoint = run / 'checkpoints/best.pt'
             model, state = load_checkpoint(checkpoint)
             self.assertEqual(state['epoch'], 0)
