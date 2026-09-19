@@ -12,7 +12,7 @@ def choose_device(requested="auto"):
         if device.type == "cuda" and not torch.cuda.is_available():
             raise ValueError("CUDA requested but unavailable")
         return device
-    # Reuse the project's global device. Its current 'cude' typo fails on CUDA hosts.
+    # Reuse the project's shared device when available.
     try:
         from utils.utils import DEVICE
         return DEVICE

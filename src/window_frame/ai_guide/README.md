@@ -43,7 +43,7 @@ PYTHONPATH=src .venv/bin/python -m window_frame.ai_guide.training.train_model --
 
 For an NVIDIA RTX 50-series card, use a current PyTorch CUDA build supporting your GPU. CPU works for small tests but is slow for full training. Start at 512×512, batch size 4; reduce the batch size if you run out of GPU memory. Actual memory use depends on your settings.
 
-The project's shared `utils.utils.DEVICE` is reused where possible. Its current `"cude"` typo would fail on a CUDA machine, so this package falls back safely without modifying the shared file. Setting `device="cuda"` selects CUDA explicitly.
+Automatic device selection uses the project's shared `utils.utils.DEVICE`: CUDA when available, otherwise CPU. Setting `device="cuda"` selects CUDA explicitly and raises an error if CUDA is unavailable.
 
 ## 2. Check the training examples
 

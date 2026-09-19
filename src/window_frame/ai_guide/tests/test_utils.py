@@ -2,6 +2,7 @@ import hashlib
 import json
 from pathlib import Path
 import random
+import runpy
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -21,6 +22,13 @@ class UtilityTests(unittest.TestCase):
             write_json(path, values)
             self.assertEqual(json.loads(path.read_text()), values)
             self.assertEqual(file_hash(path), hashlib.sha256(path.read_bytes()).hexdigest())
+
+    def test_shared_device_selects_cuda_or_cpu(self):
+        for available, expected in [(True, 'cuda'), (False, 'cpu')]:
+            with self.subTest(cuda_available=available), \
+                 patch('torch.cuda.is_available', return_value=available):
+                shared = runpy.run_module('utils.utils')
+                self.assertEqual(shared['DEVICE'], torch.device(expected))
 
     def test_explicit_cpu(self):
         self.assertEqual(choose_device('cpu'), torch.device('cpu'))

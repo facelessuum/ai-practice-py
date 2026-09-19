@@ -28,8 +28,8 @@ class ModelConfig:
 class TrainingConfig:
     epochs: int = 10
     # Set to None to use all examples. The held-out test split is unchanged.
-    max_train_samples: int | None = None
-    max_validation_samples: int | None = None
+    max_train_samples: int | None = 1500
+    max_validation_samples: int | None = 300
     # 0 disables early stopping. Preparatory stages are never stopped early.
     early_stopping_patience: int = 3
     early_stopping_min_delta: float = 0.0001
